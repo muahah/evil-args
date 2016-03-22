@@ -73,6 +73,10 @@
   "Argument delimiters."
   :type '(sexp))
 
+(defcustom evil-args-assigners '("=")
+  "Argument assigner."
+  :type '(sexp))
+
 (defun evil-args--backward-delimiter (&optional count)
   (let ((openers-regexp (regexp-opt evil-args-openers))
 	(closers-regexp (regexp-opt evil-args-closers))
@@ -135,6 +139,52 @@
 		(forward-char)))))))
     (if end (goto-char end))))
 
+(defun evil-args--goto-assigner ()
+  (let ((assigners-regexp (regexp-opt evil-args-assigners))
+	(openers-regexp (regexp-opt evil-args-openers))
+	(closers-regexp (regexp-opt evil-args-closers))
+	(delimiters-regexp (regexp-opt evil-args-delimiters))
+	(delimiters-closers-and-assigners-regexp (regexp-opt (append evil-args-delimiters
+								     evil-args-assigners
+								     evil-args-closers)))
+	(delimiters-openers-and-assigners-regexp (regexp-opt (append evil-args-delimiters
+								     evil-args-assigners
+								     evil-args-openers)))
+	(end -1))
+    (save-excursion
+      ;; search forward for an assigner, a delimiter or a closer
+      (if (not (re-search-forward delimiters-closers-and-assigners-regexp nil t))
+	  ;; not found
+	  ;; search backward for an assigner, a delimiter or an opener
+	  (if (not (re-search-backward delimiters-openers-and-assigners-regexp nil t))
+	      ;; not found (do nothing more)
+	      (message "nothing found")
+	    ;; found
+	    (backward-char)
+	    ;; if looking at a opener (stop)
+	    (if (looking-at-p openers-regexp)
+		(message "backward opener")
+	      ;; if looking at a delimiter (stop)
+	      (if (looking-at-p delimiters-regexp)
+		  (message "backward delimiter")
+		;; if looking at an assigner (yeahi)
+		(message "backward assigner")
+		(setq end (+ (point) 1))
+	      )))
+	;; found
+	(backward-char)
+	;; if looking at a closer (stop)
+	(if (looking-at-p closers-regexp)
+	    (message "forward closer")
+	  ;; if looking at a delimiter (stop)
+	  (if (looking-at-p delimiters-regexp)
+	      (message "forward delimiter")
+	    ;; if looking at an assigner (yeahi)
+	    (message "forward assigner")
+	    (setq end (+ (point) 0))
+	    )))
+      (message "finally goto %s" end)
+      (if (> end 0) (goto-char end)))))
 
 (defun evil-args--backward-arg-no-skip (count)
   (evil-args--backward-delimiter (or count 1))
@@ -231,6 +281,14 @@
 	    (setq begin (point))))
 	(if begin (goto-char begin)))
       (setq count (- count 1)))))
+
+;;;###autoload (autoload 'evil-inner-arg "evil-args")
+(evil-define-text-object evil-inner-arg-name (count &optional beg end type)
+  "Select inner delimited argument name."
+  (let ((begin (save-excursion (evil-args--backward-arg-no-skip 1) (point)))
+        (end (save-excursion (evil-args--goto-assigner) (point))))
+    (message "repalce between %s and %s" begin end)
+    (evil-range begin end)))
 
 ;; declare evil motions
 (evil-declare-motion 'evil-forward-arg)
