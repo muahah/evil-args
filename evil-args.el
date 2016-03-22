@@ -135,6 +135,31 @@
 		(forward-char)))))))
     (if end (goto-char end))))
 
+(defun evil-args--forward-opener (&optional count)
+  (let ((openers-regexp (regexp-opt evil-args-openers))
+	(closers-regexp (regexp-opt evil-args-closers))
+	(openers-and-closers-regexp (regexp-opt (append evil-args-openers
+							evil-args-closers)))
+	(end -1)
+	(count (or count 1)))
+    (save-excursion
+      (while (> count 0)
+	;; search forward for an opener
+	(if (not (re-search-forward openers-and-closers-regexp nil t))
+	    ;; not found (do nothing more)
+	    (setq count 0)
+	  ;; found
+	  (backward-char)
+	  ;; if looking at a closer (stop)
+	  (if (looking-at-p closers-regexp)
+	      (setq count 0)
+	    ;; if looking at an opener
+	    (setq end (+ (point) 1))
+	    (forward-char)
+	    (setq count (- count 1)))
+	  )))
+    (if (> end 0) (goto-char end))))
+
 (defun evil-args--backward-any-delimiter (&optional count)
   (let ((openers-regexp (regexp-opt evil-args-openers))
 	(closers-regexp (regexp-opt evil-args-closers))
@@ -291,6 +316,12 @@
       (setq count (- count 1)))))
 
 ;;;###autoload
+(defun evil-jump-in-args (count)
+  "Move the cursor in the next enclosing matching pairs."
+  (interactive "p")
+  (evil-args--forward-opener count))
+
+;;;###autoload
 (defun evil-backward-any-arg (count)
   "Move the cursor to the previous argument, regardless of the pairs."
   (interactive "p")
@@ -320,6 +351,7 @@
 (evil-declare-motion 'evil-forward-arg)
 (evil-declare-motion 'evil-backward-arg)
 (evil-declare-motion 'evil-jump-out-args)
+(evil-declare-motion 'evil-jump-in-args)
 (evil-declare-motion 'evil-backward-any-arg)
 (evil-declare-motion 'evil-forward-any-arg )
 
