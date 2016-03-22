@@ -135,6 +135,64 @@
 		(forward-char)))))))
     (if end (goto-char end))))
 
+(defun evil-args--backward-any-delimiter (&optional count)
+  (let ((openers-regexp (regexp-opt evil-args-openers))
+	(closers-regexp (regexp-opt evil-args-closers))
+	(delimiters-regexp (regexp-opt evil-args-delimiters))
+	(all-regexp (regexp-opt (append evil-args-openers
+					evil-args-closers
+					evil-args-delimiters)))
+	(end -1)
+	(count (or count 1)))
+    (save-excursion
+      (while (and (< end 0)
+		  (> count 0))
+	(backward-char)
+	(when (looking-at-p " ")
+	  (backward-char))
+	;; search forward for a delimiter, opener, or closer
+	(if (not (re-search-backward all-regexp nil t))
+	    ;; not found
+	    (setq end (- (point-at-bol) 1))
+	  ;; found:
+	  ;; (forward-char)
+	  ;; if on a closer, jump backward to be ready to add an argument
+	  (when (looking-at-p closers-regexp)
+	    (backward-char)
+	    )
+	  (if (<= (setq count (- count 1)) 0)
+	      (setq end (point))))))
+    (if end (goto-char end))))
+
+(defun evil-args--forward-any-delimiter (&optional count)
+  (let ((openers-regexp (regexp-opt evil-args-openers))
+	(closers-regexp (regexp-opt evil-args-closers))
+	(delimiters-regexp (regexp-opt evil-args-delimiters))
+	(all-regexp (regexp-opt (append evil-args-openers
+					evil-args-closers
+					evil-args-delimiters)))
+	(end -1)
+	(count (or count 1)))
+    (save-excursion
+      (while (and (< end 0)
+		  (> count 0))
+	;; if on a closer, advance to avoid detecting it again
+	(when (looking-at-p closers-regexp)
+	  (forward-char)
+	  )
+	;; search forward for a delimiter, opener, or closer
+	(if (not (re-search-forward all-regexp nil t))
+	    ;; not found
+	    (setq end (point-at-eol))
+	  ;; found:
+	  (backward-char)
+	  ;; if on a closer, jump backward to be ready to add an argument
+	  (when (looking-at-p closers-regexp)
+	    (backward-char)
+	    )
+	  (if (<= (setq count (- count 1)) 0)
+	      (setq end (point))))))
+  (if end (goto-char end))))
 
 (defun evil-args--backward-arg-no-skip (count)
   (evil-args--backward-delimiter (or count 1))
@@ -232,10 +290,38 @@
 	(if begin (goto-char begin)))
       (setq count (- count 1)))))
 
+;;;###autoload
+(defun evil-backward-any-arg (count)
+  "Move the cursor to the previous argument, regardless of the pairs."
+  (interactive "p")
+  (let ((closers-regexp (regexp-opt evil-args-closers)))
+    (evil-args--backward-any-delimiter (or count 1))
+    (forward-char)
+    (when (looking-at " ")
+      (forward-char))
+    (when (looking-at "\n")
+      (evil-next-line)
+      (evil-first-non-blank))))
+
+;;;###autoload
+(defun evil-forward-any-arg (count)
+  "Move the cursor to the next argument, regardless of the pairs."
+  (interactive "p")
+  (let ((closers-regexp (regexp-opt evil-args-closers)))
+    (evil-args--forward-any-delimiter (or count 1))
+    (forward-char)
+    (when (looking-at " ")
+      (forward-char))
+    (when (looking-at "\n")
+      (evil-next-line)
+      (evil-first-non-blank))))
+
 ;; declare evil motions
 (evil-declare-motion 'evil-forward-arg)
 (evil-declare-motion 'evil-backward-arg)
 (evil-declare-motion 'evil-jump-out-args)
+(evil-declare-motion 'evil-backward-any-arg)
+(evil-declare-motion 'evil-forward-any-arg )
 
 (provide 'evil-args)
 ;;; evil-args.el ends here
